@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -154,20 +154,19 @@
             }
             if(!ok||k.length<3){alert('数据格式错误或组数太少');return;}
 
-            // 计算 r²
-            const r = d.map(x=>x/2);
-            const y = r.map(ri=>ri*ri);
+            // 计算 D²
+            const y = d.map(di=>di*di);
             const x = k;
 
             const fit = linearRegression(x,y);
-            const b = fit.slope;
-            const sb = fit.sb;
+            const slopeD2 = fit.slope;
+            const sbD2 = fit.sb;
             const rCorr = fit.r;
 
             // 曲率半径
-            const R_mm = b / lambda_mm;
+            const R_mm = slopeD2 / (4 * lambda_mm);
             // A类不确定度 由斜率传递
-            const uA_R = sb / lambda_mm;
+            const uA_R = sbD2 / (4 * lambda_mm);
             // B类不确定度 仪器误差均匀分布
             const uB = deltaInst / Math.sqrt(3);
             // 合成标准不确定度 简化合成
@@ -182,9 +181,9 @@
             document.getElementById('result').innerHTML = `
             <strong>📊 拟合与不确定度完整结果</strong><br>
             波长 λ = ${lambda_nm.toFixed(1)} nm<br>
-            拟合方程：r² = ${b.toFixed(4)}k + ${fit.intercept.toFixed(4)}<br>
+            拟合方程：D²ₖ = ${slopeD2.toFixed(4)}k + ${fit.intercept.toFixed(4)}<br>
             相关系数 r = ${rCorr.toFixed(6)}<br>
-            斜率标准不确定度 u(b) = ${sb.toFixed(6)} mm²<br>
+            斜率标准不确定度 u(b) = ${sbD2.toFixed(6)} mm²<br>
             <hr>
             曲率半径 R = ${R_mm.toFixed(2)} mm = ${R_m.toFixed(3)} m<br>
             A类不确定度 u_A = ${uA_R.toFixed(3)} mm<br>
@@ -198,13 +197,13 @@
             // 绘图
             const ctx = document.getElementById('fitChart').getContext('2d');
             if(myChart) myChart.destroy();
-            const fitY = x.map(xi=>b*xi+fit.intercept);
+            const fitY = x.map(xi=>slopeD2*xi+fit.intercept);
             myChart = new Chart(ctx,{
                 type:'scatter',
                 data:{
                     datasets:[
                         {
-                            label:'实验数据(k, r²)',
+                            label:'实验数据(k, D²ₖ)',
                             data:x.map((xi,i)=>({x:xi,y:y[i]})),
                             backgroundColor:'#e74c3c',pointRadius:6
                         },
@@ -220,7 +219,7 @@
                     responsive:true,maintainAspectRatio:false,
                     scales:{
                         x:{title:{display:true,text:'环级数 k'}},
-                        y:{title:{display:true,text:'r² (mm²)'}}
+                        y:{title:{display:true,text:'D²ₖ (mm²)'}}
                     }
                 }
             });
