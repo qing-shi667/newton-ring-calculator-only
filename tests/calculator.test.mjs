@@ -66,3 +66,19 @@ test('runFit uses measured diameter squared and D²ₖ labels', () => {
   const expectedR = slope / (4 * 589.3e-6);
   assert.match(elements.result.innerHTML, new RegExp(`曲率半径 R = ${expectedR.toFixed(2)} mm`));
 });
+
+test('runFit formats report output without negative intercept sign, expanded uncertainty row, or k equals 2 suffix', () => {
+  const { context, elements } = createHarness();
+  elements.dataInput.value = [
+    '10 6.2450',
+    '11 6.5574',
+    '12 6.8557',
+  ].join('\n');
+
+  context.runFit();
+
+  assert.doesNotMatch(elements.result.innerHTML, /\+ -/);
+  assert.match(elements.result.innerHTML, /拟合方程：D²ₖ = [\d.]+k \+ [\d.]+/);
+  assert.doesNotMatch(elements.result.innerHTML, /扩展不确定度/);
+  assert.doesNotMatch(elements.result.innerHTML, /\(k=2\)/);
+});

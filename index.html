@@ -181,7 +181,7 @@
             document.getElementById('result').innerHTML = `
             <strong>📊 拟合与不确定度完整结果</strong><br>
             波长 λ = ${lambda_nm.toFixed(1)} nm<br>
-            拟合方程：D²ₖ = ${slopeD2.toFixed(4)}k + ${fit.intercept.toFixed(4)}<br>
+            拟合方程：D²ₖ = ${slopeD2.toFixed(4)}k + ${Math.abs(fit.intercept).toFixed(4)}<br>
             相关系数 r = ${rCorr.toFixed(6)}<br>
             斜率标准不确定度 u(b) = ${sbD2.toFixed(6)} mm²<br>
             <hr>
@@ -189,9 +189,8 @@
             A类不确定度 u_A = ${uA_R.toFixed(3)} mm<br>
             B类不确定度 u_B = ${uB.toFixed(3)} mm<br>
             合成标准不确定度 u_C = ${uC_R.toFixed(3)} mm<br>
-            扩展不确定度 U = ${U_R.toFixed(3)} mm<br>
             <hr>
-            最终结果：<strong>R = (${R_m.toFixed(3)} ± ${U_m.toFixed(3)}) m</strong>  (k=2)
+            最终结果：<strong>R = (${R_m.toFixed(3)} ± ${U_m.toFixed(3)}) m</strong>
             `;
 
             // 绘图
