@@ -67,7 +67,7 @@ test('runFit uses measured diameter squared and D²ₖ labels', () => {
   assert.match(elements.result.innerHTML, new RegExp(`曲率半径 R = ${expectedR.toFixed(2)} mm`));
 });
 
-test('runFit formats report output without negative intercept sign, expanded uncertainty row, or k equals 2 suffix', () => {
+test('runFit formats report output without negative intercept sign, expanded uncertainty row, or parenthesized k suffix', () => {
   const { context, elements } = createHarness();
   elements.dataInput.value = [
     '10 6.2450',
@@ -81,4 +81,6 @@ test('runFit formats report output without negative intercept sign, expanded unc
   assert.match(elements.result.innerHTML, /拟合方程：D²ₖ = [\d.]+k \+ [\d.]+/);
   assert.doesNotMatch(elements.result.innerHTML, /扩展不确定度/);
   assert.doesNotMatch(elements.result.innerHTML, /\(k=2\)/);
+  assert.match(elements.result.innerHTML, /最终结果：<strong>R = \d+\.\d{3}（\d+\.\d{3}）m<\/strong>/);
+  assert.doesNotMatch(elements.result.innerHTML, /±/);
 });
