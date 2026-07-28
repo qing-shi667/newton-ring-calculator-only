@@ -86,8 +86,8 @@
         </div>
         <div class="input-section">
             <label for="deltaInst">仪器最大允许误差 (mm)：</label>
-            <input type="number" id="deltaInst" value="0.004" step="0.001">
-            <p style="font-size:12px;color:#666;">读数显微镜常用 0.004mm</p>
+            <input type="number" id="deltaInst" value="0.005" step="0.001">
+            <p style="font-size:12px;color:#666;">读数显微镜常用 0.005mm</p>
         </div>
         <div class="input-section">
             <label for="dataInput">实验数据：环级数k 暗环直径d(mm)</label>
@@ -160,19 +160,22 @@
 
             const fit = linearRegression(x,y);
             const slopeD2 = fit.slope;
-            const sbD2 = fit.sb;
             const rCorr = fit.r;
+            const xMean = x.reduce((sum, value) => sum + value, 0) / x.length;
+            const sxx = x.reduce((sum, value) => sum + Math.pow(value - xMean, 2), 0);
 
             // 曲率半径
             const R_mm = slopeD2 / (4 * lambda_mm);
-            // A类不确定度 由斜率传递
-            const uA_R = sbD2 / (4 * lambda_mm);
-            // B类不确定度 仪器误差均匀分布
-            const uB = deltaInst / Math.sqrt(3);
-            // 合成标准不确定度 简化合成
-            const uC_R = Math.sqrt(uA_R*uA_R + uB*uB);
-            // 扩展不确定度 取包含因子k=2
-            const U_R = 2 * uC_R;
+            // 斜率A类不确定度：u_A(b)=S_b
+            const uA_b = Math.abs(slopeD2) * Math.sqrt(Math.max(0, (1 / (rCorr * rCorr) - 1) / (x.length - 2)));
+            // 斜率B类不确定度：先合成左右读数引入的直径不确定度
+            const uReading = deltaInst / Math.sqrt(3);
+            const uB_D = Math.sqrt(uReading * uReading + uReading * uReading);
+            const weightedDiameter = Math.sqrt(x.reduce((sum, xi, i) => sum + Math.pow((xi - xMean) * d[i], 2), 0));
+            const uB_b = (2 * uB_D / sxx) * weightedDiameter;
+            // 合成斜率标准不确定度，再传递到曲率半径
+            const U_b = Math.sqrt(uA_b * uA_b + uB_b * uB_b);
+            const U_R = U_b / (4 * lambda_mm);
 
             const R_m = R_mm / 1000;
             const U_m = U_R / 1000;
@@ -183,12 +186,14 @@
             波长 λ = ${lambda_nm.toFixed(1)} nm<br>
             拟合方程：D²ₖ = ${slopeD2.toFixed(4)}k + ${Math.abs(fit.intercept).toFixed(4)}<br>
             相关系数 r = ${rCorr.toFixed(6)}<br>
-            斜率标准不确定度 u(b) = ${sbD2.toFixed(6)} mm²<br>
+            斜率A类不确定度 u_A(b) = ${uA_b.toFixed(6)} mm²<br>
+            单次读数标准不确定度 u = ${uReading.toFixed(6)} mm<br>
+            直径B类不确定度 u_B(D) = ${uB_D.toFixed(6)} mm<br>
+            斜率B类不确定度 u_B(b) = ${uB_b.toFixed(6)} mm²<br>
+            合成斜率标准不确定度 U(b) = ${U_b.toFixed(6)} mm²<br>
             <hr>
             曲率半径 R = ${R_mm.toFixed(2)} mm = ${R_m.toFixed(3)} m<br>
-            A类不确定度 u_A = ${uA_R.toFixed(3)} mm<br>
-            B类不确定度 u_B = ${uB.toFixed(3)} mm<br>
-            合成标准不确定度 u_C = ${uC_R.toFixed(3)} mm<br>
+            曲率半径标准不确定度 U(R) = ${U_R.toFixed(3)} mm = ${U_m.toFixed(3)} m<br>
             <hr>
             最终结果：<strong>R = ${R_m.toFixed(3)}（${U_m.toFixed(3)}）m</strong>
             `;
@@ -227,7 +232,7 @@
         function clearAll(){
             document.getElementById('dataInput').value='';
             document.getElementById('lambda').value=589.3;
-            document.getElementById('deltaInst').value=0.004;
+            document.getElementById('deltaInst').value=0.005;
             document.getElementById('result').innerHTML='';
             if(myChart){myChart.destroy();myChart=null;}
         }
