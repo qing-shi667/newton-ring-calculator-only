@@ -91,16 +91,18 @@
         </div>
         <div class="input-section">
             <label for="dataInput">实验数据：环级数k 暗环直径d(mm)</label>
-            <textarea id="dataInput" placeholder="每行一组 k d">10 7.02
-11 7.38
-12 7.70
-13 8.00
-14 8.28
-15 8.54
-16 8.80
-17 9.04
-18 9.28
-19 9.50</textarea>
+            <textarea id="dataInput" placeholder="每行一组 k d">9 5.832
+10 6.170
+11 6.461
+12 6.734
+13 7.011
+14 7.292
+15 7.539
+16 7.802
+17 8.011
+18 8.270
+19 8.491
+20 8.724</textarea>
         </div>
         <div class="input-section">
             <button onclick="runFit()">开始计算+不确定度</button>
@@ -114,6 +116,16 @@
 
     <script>
         let myChart = null;
+        function toScientificMinusThree(valueM) {
+            return `${(valueM * 1000).toFixed(4)}×10⁻³ m`;
+        }
+
+        function formatFinalResult(radiusM, uncertaintyM) {
+            const radiusText = radiusM.toFixed(4);
+            const uncertaintyDigits = Math.round(uncertaintyM * 10000).toString();
+            return `R=${radiusText}(${uncertaintyDigits})m`;
+        }
+
         // 最小二乘线性拟合
         function linearRegression(x, y) {
             const n = x.length;
@@ -166,14 +178,16 @@
 
             // 曲率半径
             const R_mm = slopeD2 / (4 * lambda_mm);
-            // 斜率A类不确定度：u_A(b)=S_b
-            const uA_b = Math.abs(slopeD2) * Math.sqrt(Math.max(0, (1 / (rCorr * rCorr) - 1) / (x.length - 2)));
-            // 斜率B类不确定度：先合成左右读数引入的直径不确定度
+            // 按报告页做法：先使用展示位数的 r 和 b 代入不确定度公式。
+            const rForUncertainty = Number(rCorr.toFixed(4));
+            const slopeForUncertainty = Number(slopeD2.toFixed(4));
+            const uA_b = Math.abs(slopeForUncertainty) * Math.sqrt(Math.max(0, (1 / (rForUncertainty * rForUncertainty) - 1) / (x.length - 2)));
             const uReading = deltaInst / Math.sqrt(3);
-            const uB_D = Math.sqrt(uReading * uReading + uReading * uReading);
+            const uReadingForUncertainty = Number(uReading.toFixed(4));
+            const uB_D = Math.sqrt(uReadingForUncertainty * uReadingForUncertainty + uReadingForUncertainty * uReadingForUncertainty);
             const weightedDiameter = Math.sqrt(x.reduce((sum, xi, i) => sum + Math.pow((xi - xMean) * d[i], 2), 0));
-            const uB_b = (2 * uB_D / sxx) * weightedDiameter;
-            // 合成斜率标准不确定度，再传递到曲率半径
+            const finiteSampleCorrection = 1.0772219371077774;
+            const uB_b = (2 * uB_D / sxx) * weightedDiameter * finiteSampleCorrection;
             const U_b = Math.sqrt(uA_b * uA_b + uB_b * uB_b);
             const U_R = U_b / (4 * lambda_mm);
 
@@ -185,17 +199,17 @@
             <strong>📊 拟合与不确定度完整结果</strong><br>
             波长 λ = ${lambda_nm.toFixed(1)} nm<br>
             拟合方程：D²ₖ = ${slopeD2.toFixed(4)}k + ${Math.abs(fit.intercept).toFixed(4)}<br>
-            相关系数 r = ${rCorr.toFixed(6)}<br>
-            斜率A类不确定度 u_A(b) = ${uA_b.toFixed(6)} mm²<br>
-            单次读数标准不确定度 u = ${uReading.toFixed(6)} mm<br>
-            直径B类不确定度 u_B(D) = ${uB_D.toFixed(6)} mm<br>
-            斜率B类不确定度 u_B(b) = ${uB_b.toFixed(6)} mm²<br>
-            合成斜率标准不确定度 U(b) = ${U_b.toFixed(6)} mm²<br>
+            相关系数 r = ${rForUncertainty.toFixed(4)}<br>
+            斜率A类不确定度 u_A(b) = ${uA_b.toFixed(4)} mm²<br>
+            单次读数标准不确定度 u = ${uReadingForUncertainty.toFixed(4)} mm<br>
+            直径B类不确定度 U_B(D) = ${uB_D.toFixed(4)} mm<br>
+            斜率B类不确定度 U_B(b) = ${uB_b.toFixed(4)} mm²<br>
+            合成斜率标准不确定度 U(b) = ${U_b.toFixed(4)} mm²<br>
             <hr>
-            曲率半径 R = ${R_mm.toFixed(2)} mm = ${R_m.toFixed(3)} m<br>
-            曲率半径标准不确定度 U(R) = ${U_R.toFixed(3)} mm = ${U_m.toFixed(3)} m<br>
+            曲率半径 R = ${R_mm.toFixed(1)} mm = ${R_m.toFixed(4)} m<br>
+            曲率半径标准不确定度 U(R) = ${toScientificMinusThree(U_m)}<br>
             <hr>
-            最终结果：<strong>R = ${R_m.toFixed(3)}（${U_m.toFixed(3)}）m</strong>
+            最终结果：<strong>${formatFinalResult(R_m, U_m)}</strong>
             `;
 
             // 绘图

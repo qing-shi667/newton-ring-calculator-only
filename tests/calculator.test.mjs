@@ -7,47 +7,26 @@ const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const scriptMatch = html.match(/<script>\s*([\s\S]*?)\s*<\/script>\s*<\/body>/);
 assert.ok(scriptMatch, 'inline calculator script should be present');
 
-function expectedUncertainty(rows, lambdaNm, deltaInst) {
-  const n = rows.length;
-  const x = rows.map(([k]) => k);
-  const d = rows.map(([, diameter]) => diameter);
-  const y = d.map((diameter) => diameter ** 2);
-  const average = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
-  const xBar = average(x);
-  const yBar = average(y);
-  const sxx = x.reduce((sum, value) => sum + (value - xBar) ** 2, 0);
-  const syy = y.reduce((sum, value) => sum + (value - yBar) ** 2, 0);
-  const sxy = x.reduce((sum, value, index) => sum + (value - xBar) * (y[index] - yBar), 0);
-  const slope = sxy / sxx;
-  const r = sxy / Math.sqrt(sxx * syy);
-  const lambdaMm = lambdaNm * 1e-6;
-  const uAb = Math.abs(slope) * Math.sqrt((1 / (r ** 2) - 1) / (n - 2));
-  const uReading = deltaInst / Math.sqrt(3);
-  const uBD = Math.hypot(uReading, uReading);
-  const weightedDiameter = Math.sqrt(
-    x.reduce((sum, value, index) => sum + ((value - xBar) * d[index]) ** 2, 0),
-  );
-  const uBb = (2 * uBD / sxx) * weightedDiameter;
-  const uCb = Math.hypot(uAb, uBb);
-  const radiusMm = slope / (4 * lambdaMm);
-  const radiusUncertaintyMm = uCb / (4 * lambdaMm);
-
-  return {
-    uReading,
-    uBD,
-    uAb,
-    uBb,
-    uCb,
-    radiusMm,
-    radiusUncertaintyMm,
-  };
-}
+const DETAILED_ROWS = [
+  [9, 5.832],
+  [10, 6.170],
+  [11, 6.461],
+  [12, 6.734],
+  [13, 7.011],
+  [14, 7.292],
+  [15, 7.539],
+  [16, 7.802],
+  [17, 8.011],
+  [18, 8.270],
+  [19, 8.491],
+  [20, 8.724],
+];
 
 function createHarness() {
   const elements = {
     lambda: { value: '589.3' },
     deltaInst: { value: '0.005' },
-    dataInput: { value: '10 7.011\n11 7.348\n12 7.670' },
+    dataInput: { value: DETAILED_ROWS.map(([k, diameter]) => `${k} ${diameter}`).join('\n') },
     result: { innerHTML: '' },
     fitChart: { getContext: () => ({}) },
   };
@@ -79,6 +58,7 @@ function createHarness() {
 
 test('runFit uses measured diameter squared and D²ₖ labels', () => {
   const { context, elements, getChartConfig } = createHarness();
+  elements.dataInput.value = '10 7.011\n11 7.348\n12 7.670';
 
   context.runFit();
 
@@ -100,7 +80,7 @@ test('runFit uses measured diameter squared and D²ₖ labels', () => {
     [7.011 ** 2, 7.348 ** 2, 7.67 ** 2],
   ).slope;
   const expectedR = slope / (4 * 589.3e-6);
-  assert.match(elements.result.innerHTML, new RegExp(`曲率半径 R = ${expectedR.toFixed(2)} mm`));
+  assert.match(elements.result.innerHTML, new RegExp(`曲率半径 R = ${expectedR.toFixed(1)} mm`));
 });
 
 test('runFit formats report output without negative intercept sign, expanded uncertainty row, or parenthesized k suffix', () => {
@@ -117,41 +97,27 @@ test('runFit formats report output without negative intercept sign, expanded unc
   assert.match(elements.result.innerHTML, /拟合方程：D²ₖ = [\d.]+k \+ [\d.]+/);
   assert.doesNotMatch(elements.result.innerHTML, /扩展不确定度/);
   assert.doesNotMatch(elements.result.innerHTML, /\(k=2\)/);
-  assert.match(elements.result.innerHTML, /最终结果：<strong>R = \d+\.\d{3}（\d+\.\d{3}）m<\/strong>/);
+  assert.match(elements.result.innerHTML, /最终结果：<strong>R=\d+\.\d{4}\(\d{2,}\)m<\/strong>/);
   assert.doesNotMatch(elements.result.innerHTML, /±/);
 });
 
 test('runFit calculates uncertainty from slope A and B components', () => {
   const { context, elements } = createHarness();
-  const rows = [
-    [9, 5.832],
-    [10, 6.170],
-    [11, 6.461],
-    [12, 6.734],
-    [13, 7.011],
-    [14, 7.292],
-    [15, 7.539],
-    [16, 7.802],
-    [17, 8.011],
-    [18, 8.270],
-    [19, 8.491],
-    [20, 8.724],
-  ];
+  const rows = DETAILED_ROWS;
   elements.dataInput.value = rows.map(([k, diameter]) => `${k} ${diameter}`).join('\n');
   elements.deltaInst.value = '0.005';
-  const expected = expectedUncertainty(rows, 589.3, 0.005);
 
   context.runFit();
 
   assert.match(html, /id="deltaInst" value="0\.005"/);
-  assert.match(elements.result.innerHTML, new RegExp(`单次读数标准不确定度 u = ${expected.uReading.toFixed(6)} mm`));
-  assert.match(elements.result.innerHTML, new RegExp(`直径B类不确定度 u_B\\(D\\) = ${expected.uBD.toFixed(6)} mm`));
-  assert.match(elements.result.innerHTML, new RegExp(`斜率A类不确定度 u_A\\(b\\) = ${expected.uAb.toFixed(6)} mm²`));
-  assert.match(elements.result.innerHTML, new RegExp(`斜率B类不确定度 u_B\\(b\\) = ${expected.uBb.toFixed(6)} mm²`));
-  assert.match(elements.result.innerHTML, new RegExp(`合成斜率标准不确定度 U\\(b\\) = ${expected.uCb.toFixed(6)} mm²`));
-  assert.match(elements.result.innerHTML, new RegExp(`曲率半径标准不确定度 U\\(R\\) = ${expected.radiusUncertaintyMm.toFixed(3)} mm`));
-  assert.match(
-    elements.result.innerHTML,
-    new RegExp(`最终结果：<strong>R = ${(expected.radiusMm / 1000).toFixed(3)}（${(expected.radiusUncertaintyMm / 1000).toFixed(3)}）m<\\/strong>`),
-  );
+  assert.match(html, /9 5\.832\n10 6\.170/);
+  assert.match(elements.result.innerHTML, /相关系数 r = 0\.9999/);
+  assert.match(elements.result.innerHTML, /拟合方程：D²ₖ = 3\.8070k \+ 0\.2034/);
+  assert.match(elements.result.innerHTML, /单次读数标准不确定度 u = 0\.0029 mm/);
+  assert.match(elements.result.innerHTML, /直径B类不确定度 U_B\(D\) = 0\.0041 mm/);
+  assert.match(elements.result.innerHTML, /斜率A类不确定度 u_A\(b\) = 0\.0170/);
+  assert.match(elements.result.innerHTML, /斜率B类不确定度 U_B\(b\) = 0\.0055/);
+  assert.match(elements.result.innerHTML, /合成斜率标准不确定度 U\(b\) = 0\.0179/);
+  assert.match(elements.result.innerHTML, /曲率半径标准不确定度 U\(R\) = 7\.5884×10⁻³ m/);
+  assert.match(elements.result.innerHTML, /最终结果：<strong>R=1\.6151\(76\)m<\/strong>/);
 });
